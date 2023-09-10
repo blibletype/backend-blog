@@ -12,7 +12,7 @@ const { __dirname, __filename } = fileDirName(import.meta);
 const app = express();
 
 app.use(bodyParser.json());
-app.use('/images', express.static(path.join(__dirname, 'src', 'images')));
+app.use('/images', express.static(path.join(__dirname, 'images')));
 
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');

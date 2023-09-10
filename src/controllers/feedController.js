@@ -37,7 +37,7 @@ export const createPost = async (req, res, next) => {
     const post = await Post.create({
       title: title,
       content: content,
-      imageUrl: 'src/images/book.jpg',
+      imageUrl: 'images/book.jpg',
       creator: {
         name: 'blibletype',
       },
