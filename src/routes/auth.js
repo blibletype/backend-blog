@@ -24,4 +24,7 @@ router.put('/signup',[
     .isLength({ min: 5 })
 ], errorController.validate, authController.signup);
 
+// POST /auth/signin
+router.post('/signin', authController.signin);
+
 module.exports = router;

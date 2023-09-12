@@ -1,4 +1,5 @@
 const Post = require('../models/post.js');
+const User = require('../models/user');
 const { clearImage } = require('../utils/fs.js');
 
 exports.getPosts = async (req, res, next) => {
@@ -8,8 +9,8 @@ exports.getPosts = async (req, res, next) => {
     const totalItems = await Post.find().countDocuments();
     const posts = await Post.find()
       .skip((currentPage - 1) * perPage)
-      .limit(perPage);
-
+      .limit(perPage)
+      .populate('creator');
     res.status(200).json({
       posts: posts,
       totalItems: totalItems
@@ -45,13 +46,18 @@ exports.createPost = async (req, res, next) => {
       title: title,
       content: content,
       imageUrl: imageUrl,
-      creator: {
-        name: 'blibletype',
-      },
+      creator: req.userId,
     });
+    const user = await User.findById(req.userId);
+    user.posts.push(post);
+    await user.save();
     res.status(201).json({
       message: 'post created',
       post: post,
+      creator: {
+        _id: user._id,
+        name: user.name
+      }
     });
   } catch (error) {
     next(error);
@@ -76,6 +82,11 @@ exports.editPost = async (req, res, next) => {
     try {
       const post = await Post.findById(id);
       if (!post) throw new Error();
+      if (post.creator.toString() !== req.userId) {
+        const error = new Error('Not authenticated');
+        error.statusCode = 401;
+        throw error;
+      }
       if (imageUrl !== post.imageUrl) {
         clearImage(post.imageUrl);
       }
@@ -86,7 +97,7 @@ exports.editPost = async (req, res, next) => {
       res.status(200).json({ post });
     } catch (error) {
       error.message = 'Could not find post';
-      error.statusCode = 404;
+      error.statusCode = error.statusCode || 404;
       next(error);
     }
   } catch (error) {
@@ -98,13 +109,23 @@ exports.deletePost = async (req, res, next) => {
   try {
     const { id } = req.params;
     const post = await Post.findById(id);
-    if (!post) throw new Error();
+    if (!post) {
+      const error = new Error('Could not find post');
+      error.statusCode = 404;
+      throw error;
+    }
+    if (post.creator.toString() !== req.userId) {
+      const error = new Error('Not authenticated');
+      error.statusCode = 401;
+      throw error;
+    }
     await post.deleteOne();
+    const creator = await User.findById(req.userId);
+    creator.posts.pull(id);
+    await creator.save();
     clearImage(post.imageUrl);
     res.status(200).json({ message: 'Post successfully deleted' });
   } catch (error) {
-    error.message = 'Could not find post';
-    error.statusCode = 404;
     next(error);
   }
 };
