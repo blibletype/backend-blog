@@ -1,17 +1,20 @@
-import express from 'express';
-import feedRouter from './routes/feed.js';
-import bodyParser from 'body-parser';
-import mongoose from 'mongoose';
-import path from 'path';
-import fileDirName from './utils/fileDirName.js';
-import * as errorController from './controllers/errorController.js';
-import dotenv from 'dotenv';
-dotenv.config();
-const { __dirname, __filename } = fileDirName(import.meta);
+const express = require('express');
+const feedRouter = require('./routes/feed');
+const authRouter = require('./routes/auth');
+const bodyParser = require('body-parser');
+const mongoose = require('mongoose');
+const path = require('path');
+const errorController = require('./controllers/errorController');
+const multer = require('multer');
+const { fileFilter, fileStorage } = require('./utils/multer');
+require('dotenv').config();
 
 const app = express();
 
 app.use(bodyParser.json());
+app.use(
+  multer({ storage: fileStorage, fileFilter: fileFilter }).single('image')
+);
 app.use('/images', express.static(path.join(__dirname, 'images')));
 
 app.use((req, res, next) => {
@@ -25,6 +28,7 @@ app.use((req, res, next) => {
 });
 
 app.use('/feed', feedRouter);
+app.use('/auth', authRouter);
 
 app.use(errorController.handleError);
 
