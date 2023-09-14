@@ -1,6 +1,7 @@
 const Post = require('../models/post.js');
 const User = require('../models/user');
 const { clearImage } = require('../utils/fs.js');
+const { getIO } = require('../utils/websocket');
 
 exports.getPosts = async (req, res, next) => {
   try {
@@ -10,6 +11,7 @@ exports.getPosts = async (req, res, next) => {
     const posts = await Post.find()
       .skip((currentPage - 1) * perPage)
       .limit(perPage)
+      .sort({ createdAt: -1 })
       .populate('creator');
     res.status(200).json({
       posts: posts,
@@ -59,6 +61,13 @@ exports.createPost = async (req, res, next) => {
         name: user.name
       }
     });
+    getIO().emit('posts',
+      { action: 'create',
+        post: {
+          ...post._doc,
+          creator: { _id: req.userId, name: user.name }
+        }
+      });
   } catch (error) {
     next(error);
   }
@@ -80,9 +89,9 @@ exports.editPost = async (req, res, next) => {
 
     // find alternatives to refactor this
     try {
-      const post = await Post.findById(id);
+      const post = await Post.findById(id).populate('creator');
       if (!post) throw new Error();
-      if (post.creator.toString() !== req.userId) {
+      if (post.creator._id.toString() !== req.userId) {
         const error = new Error('Not authenticated');
         error.statusCode = 401;
         throw error;
@@ -94,6 +103,10 @@ exports.editPost = async (req, res, next) => {
       post.content = content;
       post.imageUrl = imageUrl;
       await post.save();
+      getIO().emit('posts', {
+        action: 'update',
+        post: post
+      });
       res.status(200).json({ post });
     } catch (error) {
       error.message = 'Could not find post';
@@ -120,6 +133,7 @@ exports.deletePost = async (req, res, next) => {
       throw error;
     }
     await post.deleteOne();
+    getIO().emit('posts', { action: 'delete', post: id });
     const creator = await User.findById(req.userId);
     creator.posts.pull(id);
     await creator.save();
